@@ -1,0 +1,26 @@
+steps:
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'us-central1-docker.pkg.dev/in-activity-2/kuber-repo/microservice1', '.']
+    id: 'Build Docker Image'
+
+    # Push the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'us-central1-docker.pkg.dev/in-activity-2/kuber-repo/microservice1']
+    id: 'Push Docker Image'
+
+    # Deploy the container image to GKE using gke-deploy
+  - name: 'gcr.io/cloud-builders/gke-deploy'
+    args:
+      - run
+      - --filename=config/
+      - --image=us-central1-docker.pkg.dev/in-activity-2/kuber-repo/microservice1
+      - --location=us-central1-a
+      - --cluster=primary-cluster
+      -  --timeout=10m
+
+images:
+  - 'us-central1-docker.pkg.dev/in-activity-2/kuber-repo/microservice1'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
