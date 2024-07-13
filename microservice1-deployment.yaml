@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: microservice1
-        image: us-central1-docker.pkg.dev/kubernetes-assignment-429023/kuber-repo/microservice1:latest
+        image: us-central1-docker.pkg.dev/in-activity-2/kuber-repo/microservice1:latest
         ports:
         - containerPort: 5000
         volumeMounts:
