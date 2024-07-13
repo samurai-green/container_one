@@ -1,77 +1,66 @@
-from flask import Flask, request, jsonify
-import requests
-import json
+import csv
 import os
+import requests
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-# Path to the directory where files will be stored
-PERSISTENT_STORAGE_PATH = '/home/ghost/app/persistent_storage/'
-container_2_url = (os.getenv('CONTAINER_2_URI') or 'http://localhost:4000') + '/calculate-sum'
+# Directory where files will be stored
+STORAGE_DIR = '/persistent_storage'
 
-if not os.path.exists(PERSISTENT_STORAGE_PATH):
-    print("ERROR PERSISTENT_STORAGE_PATH not found")
-    os.makedirs(PERSISTENT_STORAGE_PATH)
+# Ensure the storage directory exists
+if not os.path.exists(STORAGE_DIR):
+    os.makedirs(STORAGE_DIR)
 
-def save_file(filename, data):
-    try:
-        filepath = os.path.join(PERSISTENT_STORAGE_PATH, filename)
-        with open(filepath, 'w') as file:
-            file.write(data)
-        return True, "Success."
-    except Exception as e:
-        return False, f"Error while storing the file to the rtorage: {str(e)}"
-
-def file_exists(filename):
-    return os.path.exists(os.path.join(PERSISTENT_STORAGE_PATH, filename))
+@app.route('/')
+def home():
+    return "Welcome to Microservice 1"
 
 @app.route('/store-file', methods=['POST'])
 def store_file():
+    data = request.get_json()
+    file_name = data.get('file')
+    file_data = data.get('data')
+
+    if not file_name or not file_data:
+        return jsonify({"file": file_name, "error": "Invalid JSON input."}), 400
+
     try:
-        request_data = request.get_json()
-        filename = request_data.get('file')
-        data = request_data.get('data')
-        
-        if not filename or not data:
-            return jsonify({"file": filename, "error": "Invalid JSON input."}), 400
-        
-        success, message = save_file(filename, data)
-        
-        if success:
-            return jsonify({"file": filename, "message": message}), 200
-        else:
-            return jsonify({"file": filename, "error": message}), 500
-    
+        file_path = os.path.join(STORAGE_DIR, file_name)
+        with open(file_path, 'w') as f:
+            f.write(file_data)
+
+        return jsonify({"file": file_name, "message": "Success."}), 200
     except Exception as e:
-        return jsonify({"file": None, "error": str(e)}), 500
+        return jsonify({"file": file_name, "error": "Error while storing the file to the storage."}), 500
 
 @app.route('/calculate', methods=['POST'])
 def calculate():
+    data = request.get_json()
+    file_name = data.get('file')
+    product = data.get('product')
+
+    # Check if file name is provided
+    if not file_name or not product:
+        return jsonify({"file": file_name, "error": "Invalid JSON input."}), 400
+
     try:
-        request_data = request.get_json()
-        filename = request_data.get('file')
-        product = request_data.get('product')
-        
-        if not filename or not product:
-            return jsonify({"file": filename, "error": "Invalid JSON input."}), 400
-        
-        if not file_exists(filename):
-            return jsonify({"file": filename, "error": "File not found."}), 404
-        
-        # Communicate with container 2 to calculate the product sum
-        # Assuming container 2 is accessible via HTTP request and has an endpoint /calculate-sum
-        response = requests.post(container_2_url, json={"file": filename, "product": product})
+        # Call Microservice 2's /calculate endpoint
+        response = call_microservice2_calculate(file_name, product)
+        return jsonify(response.json()), response.status_code
 
-        return response.json()
-        
-        if response.status_code == 200:
-            return response.json(), 200
-        else:
-            return jsonify({"file": filename, "error": "Error while calculating the sum." }), 500
-    
     except Exception as e:
-        return jsonify({"file": None, "error": str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=6000)
+def call_microservice2_calculate(file_name, product):
+    microservice2_url = 'http://microservice2.default.svc.cluster.local/calculate'
+    payload = {
+        "file": file_name,
+        "product": product
+    }
+    headers = {'Content-Type': 'application/json'}
+    response = requests.post(microservice2_url, json=payload, headers=headers)
+    return response
 
+if __name__ == '_main_':
+    app.run(host='0.0.0.0', port=5000)
